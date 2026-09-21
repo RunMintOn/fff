@@ -708,68 +708,43 @@ describe("compact tool rendering", () => {
     return tool;
   }
 
-  test("ffgrep starts collapsed and click expands its complete result", async () => {
+  test("ffgrep renders collapsed by default and full when pi reports expanded", async () => {
     const setup = await start("tools-and-ui");
     const tool = toolByName(setup, "ffgrep");
-    const context: {
-      state: { fffCompactExpanded?: boolean };
-      invalidate: ReturnType<typeof mock>;
-      isError: boolean;
-    } = { state: {}, invalidate: mock(() => undefined), isError: false };
+    const context = { state: {}, invalidate: mock(() => undefined), isError: false };
 
     const call = tool.renderCall(
       { pattern: "TODO", path: ".", limit: 3, context: 2 },
       theme,
       context,
     );
-    expect(call.component.render(80)).toEqual([
-      "ffgrep /TODO/ in . (limit 3, context 2)",
-    ]);
+    expect(call.render(80)).toEqual(["ffgrep /TODO/ in . (limit 3, context 2)"]);
 
     const defaultCall = tool.renderCall({ pattern: "TODO", path: "." }, theme, context);
-    expect(defaultCall.component.render(80)).toEqual(["ffgrep /TODO/ in ."]);
+    expect(defaultCall.render(80)).toEqual(["ffgrep /TODO/ in ."]);
 
-    const result = tool.renderResult(
-      { content: [{ type: "text", text: "first\nsecond\nthird" }] },
-      { expanded: false },
-      theme,
-      context,
-    );
+    const content = [{ type: "text", text: "first\nsecond\nthird" }];
+    const collapsed = tool.renderResult({ content }, { expanded: false }, theme, context);
+    expect(collapsed.render(80)).toEqual(["first ... (2 more lines)"]);
 
-    expect(result.component.render(80)).toEqual(["first ... (2 more lines)"]);
-    expect(result.onMouse({ type: "click", button: "left" })).toEqual({ handled: true });
-    expect(context.state.fffCompactExpanded).toBe(true);
-    expect(context.invalidate).toHaveBeenCalledTimes(1);
-
-    const expanded = tool.renderResult(
-      { content: [{ type: "text", text: "first\nsecond\nthird" }] },
-      { expanded: false },
-      theme,
-      context,
-    );
-    expect(expanded.component.text).toBe("first\nsecond\nthird");
+    const expanded = tool.renderResult({ content }, { expanded: true }, theme, context);
+    expect(expanded.text).toBe("first\nsecond\nthird");
   });
 
-  test("fffind call and result share the click expansion state", async () => {
+  test("fffind result follows the expanded option", async () => {
     const setup = await start("tools-and-ui");
     const tool = toolByName(setup, "fffind");
-    const context: {
-      state: { fffCompactExpanded?: boolean };
-      invalidate: ReturnType<typeof mock>;
-      isError: boolean;
-    } = { state: {}, invalidate: mock(() => undefined), isError: false };
+    const context = { state: {}, invalidate: mock(() => undefined), isError: false };
+
     const call = tool.renderCall({ pattern: "index", path: "src" }, theme, context);
+    expect(call.render(80)).toEqual(["fffind index in src"]);
 
-    expect(call.onMouse({ type: "click", button: "left" })).toEqual({ handled: true });
-    expect(context.state.fffCompactExpanded).toBe(true);
+    const content = [{ type: "text", text: "src/index.ts\nsrc/main.ts" }];
+    const collapsed = tool.renderResult({ content }, { expanded: false }, theme, context);
+    expect(collapsed.render(80)).toEqual(["src/index.ts ... (1 more lines)"]);
 
-    const result = tool.renderResult(
-      { content: [{ type: "text", text: "src/index.ts\nsrc/main.ts" }] },
-      { expanded: false },
-      theme,
-      context,
-    );
-    expect(result.component.text).toBe("src/index.ts\nsrc/main.ts");
+    const expanded = tool.renderResult({ content }, { expanded: true }, theme, context);
+    expect(expanded.text).toBe("src/index.ts\nsrc/main.ts");
   });
 });
 

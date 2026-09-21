@@ -15,7 +15,6 @@ import {
   type AutocompleteItem,
   type AutocompleteProvider,
   type Component,
-  MouseRegion,
   sliceByColumn,
   Text,
   visibleWidth,
@@ -829,48 +828,29 @@ export default function fffExtension(pi: ExtensionAPI) {
     invalidate(): void {}
   }
 
-  function isToolExpanded(context: any): boolean {
-    return context.state.fffCompactExpanded === true;
-  }
-
-  function makeToolClickable(component: Component, context: any): Component {
-    return new MouseRegion(component, (event) => {
-      if (event.type !== "click" || event.button !== "left") return undefined;
-      context.state.fffCompactExpanded = !isToolExpanded(context);
-      context.invalidate();
-      return { handled: true };
-    });
-  }
-
+  // Pi wraps returned components in its own click-to-expand MouseRegion and passes
+  // the toggled state via options.expanded, so no custom mouse handling is needed.
   const renderCompactTextResult = (
     result: { content?: { type: string; text?: string }[] },
+    options: { expanded?: boolean },
     theme: any,
     context: any,
   ): Component => {
     const output = result.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
-    if (!output) {
-      return makeToolClickable(new Text(theme.fg("muted", "No output"), 0, 0), context);
-    }
+    if (!output) return new Text(theme.fg("muted", "No output"), 0, 0);
 
     const lines = output.split("\n");
-    if (isToolExpanded(context)) {
-      const color = context.isError ? "error" : "toolOutput";
-      return makeToolClickable(
-        new Text(lines.map((line) => theme.fg(color, line)).join("\n"), 0, 0),
-        context,
-      );
+    const color = context.isError ? "error" : "toolOutput";
+    if (options.expanded) {
+      return new Text(lines.map((line) => theme.fg(color, line)).join("\n"), 0, 0);
     }
 
-    const color = context.isError ? "error" : "toolOutput";
     const suffix =
       lines.length > 1 ? theme.fg("muted", `... (${lines.length - 1} more lines)`) : "";
-    return makeToolClickable(
-      new CollapsedText(
-        theme.fg(color, lines[0] ?? ""),
-        suffix,
-        theme.fg("muted", "..."),
-      ),
-      context,
+    return new CollapsedText(
+      theme.fg(color, lines[0] ?? ""),
+      suffix,
+      theme.fg("muted", "..."),
     );
   };
 
@@ -1080,7 +1060,7 @@ export default function fffExtension(pi: ExtensionAPI) {
       };
     },
 
-    renderCall(args, theme, context) {
+    renderCall(args, theme) {
       const pattern = args?.pattern ?? "";
       const path = args?.path ?? ".";
       let content =
@@ -1094,14 +1074,11 @@ export default function fffExtension(pi: ExtensionAPI) {
       if (options.length > 0)
         content += theme.fg("toolOutput", ` (${options.join(", ")})`);
       if (args?.cursor) content += theme.fg("muted", ` (page)`);
-      return makeToolClickable(
-        new CollapsedText(content, "", theme.fg("muted", "...")),
-        context,
-      );
+      return new CollapsedText(content, "", theme.fg("muted", "..."));
     },
 
-    renderResult(result, _options, theme, context) {
-      return renderCompactTextResult(result, theme, context);
+    renderResult(result, options, theme, context) {
+      return renderCompactTextResult(result, options, theme, context);
     },
   });
 
@@ -1227,7 +1204,7 @@ export default function fffExtension(pi: ExtensionAPI) {
       };
     },
 
-    renderCall(args, theme, context) {
+    renderCall(args, theme) {
       const pattern = args?.pattern ?? "";
       const path = args?.path ?? ".";
       let content =
@@ -1238,14 +1215,11 @@ export default function fffExtension(pi: ExtensionAPI) {
       if (args?.limit !== undefined)
         content += theme.fg("toolOutput", ` (limit ${args.limit})`);
       if (args?.cursor) content += theme.fg("muted", ` (page)`);
-      return makeToolClickable(
-        new CollapsedText(content, "", theme.fg("muted", "...")),
-        context,
-      );
+      return new CollapsedText(content, "", theme.fg("muted", "..."));
     },
 
-    renderResult(result, _options, theme, context) {
-      return renderCompactTextResult(result, theme, context);
+    renderResult(result, options, theme, context) {
+      return renderCompactTextResult(result, options, theme, context);
     },
   });
 
