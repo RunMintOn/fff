@@ -16,6 +16,8 @@ mock.module("@earendil-works/pi-tui", () => ({
       this.text = text;
     }
   },
+  sliceByColumn: (text: string, _start: number, end: number) => text.slice(0, end),
+  visibleWidth: (text: string) => text.length,
 }));
 
 const schema = (type: string) => (options?: unknown) => ({ type, options });
