@@ -266,6 +266,7 @@ pub unsafe extern "C" fn fff_create_instance_with(opts: *const FffCreateOptions)
             follow_symlinks: opts.version >= 2 && opts.follow_symlinks,
             enable_fs_root_scanning: opts.enable_fs_root_scanning,
             enable_home_dir_scanning: opts.enable_home_dir_scanning,
+            git_recency: Default::default(),
         },
     ) {
         return FffResult::err(&format!("Failed to init file picker: {}", e));
@@ -627,6 +628,46 @@ pub unsafe extern "C" fn fff_live_grep(
     after_context: u32,
     classify_definitions: bool,
 ) -> *mut FffResult {
+    unsafe {
+        fff_live_grep_ex(
+            fff_handle,
+            query,
+            mode,
+            max_file_size,
+            max_matches_per_file,
+            smart_case,
+            file_offset,
+            page_limit,
+            time_budget_ms,
+            false,
+            before_context,
+            after_context,
+            classify_definitions,
+        )
+    }
+}
+
+/// [`fff_live_grep`] plus `enforce_time_budget`: when true the budget also bounds
+/// zero-match searches and `next_file_offset` resumes at the first unsearched file.
+///
+/// ## Safety
+/// Same as [`fff_live_grep`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fff_live_grep_ex(
+    fff_handle: *mut c_void,
+    query: *const c_char,
+    mode: u8,
+    max_file_size: u64,
+    max_matches_per_file: u32,
+    smart_case: bool,
+    file_offset: u32,
+    page_limit: u32,
+    time_budget_ms: u64,
+    enforce_time_budget: bool,
+    before_context: u32,
+    after_context: u32,
+    classify_definitions: bool,
+) -> *mut FffResult {
     let inst = match unsafe { instance_ref(fff_handle) } {
         Ok(i) => i,
         Err(e) => return e,
@@ -664,6 +705,7 @@ pub unsafe extern "C" fn fff_live_grep(
         page_limit: default_u32(page_limit, 50) as usize,
         mode: grep_mode_from_u8(mode),
         time_budget_ms,
+        enforce_time_budget,
         before_context: before_context as usize,
         after_context: after_context as usize,
         classify_definitions,
@@ -696,6 +738,45 @@ pub unsafe extern "C" fn fff_multi_grep(
     file_offset: u32,
     page_limit: u32,
     time_budget_ms: u64,
+    before_context: u32,
+    after_context: u32,
+    classify_definitions: bool,
+) -> *mut FffResult {
+    unsafe {
+        fff_multi_grep_ex(
+            fff_handle,
+            patterns_joined,
+            constraints,
+            max_file_size,
+            max_matches_per_file,
+            smart_case,
+            file_offset,
+            page_limit,
+            time_budget_ms,
+            false,
+            before_context,
+            after_context,
+            classify_definitions,
+        )
+    }
+}
+
+/// [`fff_multi_grep`] plus `enforce_time_budget`, as in [`fff_live_grep_ex`].
+///
+/// ## Safety
+/// Same as [`fff_multi_grep`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fff_multi_grep_ex(
+    fff_handle: *mut c_void,
+    patterns_joined: *const c_char,
+    constraints: *const c_char,
+    max_file_size: u64,
+    max_matches_per_file: u32,
+    smart_case: bool,
+    file_offset: u32,
+    page_limit: u32,
+    time_budget_ms: u64,
+    enforce_time_budget: bool,
     before_context: u32,
     after_context: u32,
     classify_definitions: bool,
@@ -746,6 +827,7 @@ pub unsafe extern "C" fn fff_multi_grep(
         page_limit: default_u32(page_limit, 50) as usize,
         mode: fff::GrepMode::PlainText, // ignored by multi_grep_search
         time_budget_ms,
+        enforce_time_budget,
         before_context: before_context as usize,
         after_context: after_context as usize,
         classify_definitions,
@@ -932,6 +1014,10 @@ pub unsafe extern "C" fn fff_restart_index(
         } else {
             (false, true, true, FFFMode::default(), false, false, false)
         };
+    let git_recency = guard
+        .as_ref()
+        .map(|p| p.git_recency_config())
+        .unwrap_or_default();
 
     drop(guard);
 
@@ -948,6 +1034,7 @@ pub unsafe extern "C" fn fff_restart_index(
             follow_symlinks,
             enable_fs_root_scanning: fs_root,
             enable_home_dir_scanning: home_dir,
+            git_recency,
         },
     ) {
         Ok(()) => FffResult::ok_empty(),
